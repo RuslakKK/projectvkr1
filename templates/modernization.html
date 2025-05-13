@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Планирование модернизации</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <!-- Шапка -->
+  <div class="header">
+    Учёт компьютерной техники
+    <div class="profile">
+      <strong>{{ current_user.role }}</strong> <strong>{{ fullname }}</strong> |
+       <a href="/logout" style="color: white;">Выйти</a>
+     </div>
+  </div>
+
+  <!-- Навигация -->
+  <div class="tabs">
+    <a class="tab-btn" href="/">Учёт компьютерной техники</a>
+    <a class="tab-btn" href="/history">История изменений</a>
+    <a class="tab-btn active" href="/modernization">Планирование модернизации</a>
+  </div>
+
+  <!-- Блок условий -->
+  <div class="container" style="padding: 20px;">
+    <h2>Условия модернизации</h2>
+    <div id="conditions"></div>
+    <button onclick="addCondition()" class="add-button">➕ Добавить условие</button>
+    <br><br>
+    <button onclick="runUpgradeCheck()" class="primary-button">Составить список</button>
+    <button onclick="clearAll()" class="primary-button" style="margin-left: 10px;">Очистить</button>
+
+
+    <!-- Результат -->
+    <div id="results" style="margin-top: 30px; display: none; border: 2px solid #3a56a1; padding: 15px; border-radius: 6px; background-color: #f0f4ff;">
+      <h3>Подходящие компьютеры:</h3>
+      <ul id="result-list"></ul>
+    </div>
+  </div>
+</body>
+
+<script>
+  let maxConditions = 5;
+  let conditionCount = 0;
+  
+  function saveConditionsToStorage() {
+    const conditions = [];
+    document.querySelectorAll('.condition-line').forEach(line => {
+      conditions.push({
+        field: line.querySelector('.field-select').value,
+        operator: line.querySelector('.operator-select').value,
+        value: line.querySelector('.value-input').value
+      });
+    });
+    localStorage.setItem("upgradeConditions", JSON.stringify(conditions));
+  }
+  
+  function addCondition(field = "processor-name", operator = "=", value = "") {
+    if (conditionCount >= maxConditions) return;
+  
+    const container = document.getElementById('conditions');
+    const div = document.createElement('div');
+    div.className = "condition-line";
+    div.innerHTML = `
+      <label>Поле:
+        <select class="field-select">
+          <option value="processor-name">Процессор</option>
+          <option value="ram-number">ОЗУ (ГБ)</option>
+          <option value="storageunit-name">Накопитель</option>
+          <option value="monitor-name">Монитор</option>
+          <option value="device-type">Тип устройства</option>
+        </select>
+      </label>
+      <label>Оператор:
+        <select class="operator-select">
+          <option value="=">=</option>
+          <option value="!=">≠</option>
+          <option value=">">></option>
+          <option value="<"><</option>
+          <option value="LIKE">Содержит</option>
+        </select>
+      </label>
+      <input type="text" class="value-input" placeholder="Значение">
+      <button onclick="removeCondition(this)">❌</button>
+      <br><br>
+    `;
+    container.appendChild(div);
+    conditionCount++;
+  
+    const fieldSel = div.querySelector('.field-select');
+    const opSel = div.querySelector('.operator-select');
+    const input = div.querySelector('.value-input');
+  
+    fieldSel.value = field;
+    opSel.value = operator;
+    input.value = value;
+  
+    fieldSel.onchange = () => {
+      setupAutocomplete(fieldSel.value, input);
+      saveConditionsToStorage();
+    };
+    input.oninput = saveConditionsToStorage;
+    opSel.onchange = saveConditionsToStorage;
+  
+    setupAutocomplete(fieldSel.value, input);
+    saveConditionsToStorage();
+  }
+  
+  function removeCondition(btn) {
+    btn.parentElement.remove();
+    conditionCount--;
+    saveConditionsToStorage();
+  }
+  
+  function setupAutocomplete(field, inputElement) {
+    if (!["processor-name", "monitor-name", "storageunit-name"].includes(field)) return;
+  
+    fetch(`/api/autocomplete/${field}`)
+      .then(res => res.json())
+      .then(suggestions => {
+        inputElement.setAttribute("list", field + "-list");
+        let datalist = document.getElementById(field + "-list");
+        if (!datalist) {
+          datalist = document.createElement("datalist");
+          datalist.id = field + "-list";
+          document.body.appendChild(datalist);
+        }
+        datalist.innerHTML = '';
+        suggestions.forEach(item => {
+          const option = document.createElement("option");
+          option.value = item;
+          datalist.appendChild(option);
+        });
+      });
+  }
+  
+  function runUpgradeCheck() {
+    const fields = document.querySelectorAll('.field-select');
+    const ops = document.querySelectorAll('.operator-select');
+    const values = document.querySelectorAll('.value-input');
+  
+    let conditions = [];
+  
+    for (let i = 0; i < fields.length; i++) {
+      if (values[i].value.trim()) {
+        conditions.push({
+          field: fields[i].value,
+          operator: ops[i].value,
+          value: values[i].value
+        });
+      }
+    }
+  
+    if (conditions.length === 0) return alert("Добавьте хотя бы одно условие");
+  
+    fetch('/api/modernization-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conditions })
+    })
+    .then(res => res.json())
+    .then(data => {
+      const resultBox = document.getElementById('results');
+      const list = document.getElementById('result-list');
+      list.innerHTML = '';
+      data.forEach(pc => {
+        list.innerHTML += `<li>${pc.pc_name} — ${pc.sam_account_name}</li>`;
+      });
+      resultBox.style.display = 'block';
+  
+      // Сохраняем результат
+      fetch('/api/modernization-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+    });
+  }
+  
+  function clearAll() {
+    localStorage.removeItem("upgradeConditions");
+    document.getElementById('conditions').innerHTML = '';
+    document.getElementById('result-list').innerHTML = '';
+    document.getElementById('results').style.display = 'none';
+    conditionCount = 0;
+    addCondition();
+  }
+  
+  window.onload = () => {
+    const saved = JSON.parse(localStorage.getItem("upgradeConditions") || "[]");
+    if (saved.length > 0) {
+      saved.forEach(c => addCondition(c.field, c.operator, c.value));
+    } else {
+      addCondition();
+    }
+  
+    fetch('/api/modernization-load')
+      .then(res => res.json())
+      .then(prev => {
+        if (prev.length) {
+          const list = document.getElementById('result-list');
+          list.innerHTML = '';
+          prev.forEach(pc => {
+            list.innerHTML += `<li>${pc.pc_name} — ${pc.sam_account_name}</li>`;
+          });
+          document.getElementById('results').style.display = 'block';
+        }
+      });
+  };
+  </script>
+  
+  
+
+</html>

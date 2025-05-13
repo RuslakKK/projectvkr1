@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Авторизация</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    body {
+      margin: 0;
+      background-color: #f4f6fb;
+      font-family: "Segoe UI", sans-serif;
+    }
+
+    .header {
+      background-color: #003366;
+      color: white;
+      padding: 15px 30px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .login-container {
+      max-width: 400px;
+      margin: 60px auto;
+      padding: 30px 40px;
+      background-color: white;
+      border: 2px solid #3a56a1;
+      border-radius: 10px;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .login-container h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #003366;
+    }
+
+    .login-container label {
+      display: block;
+      margin: 12px 0 4px;
+      font-weight: bold;
+    }
+
+    .login-container input[type="text"],
+    .login-container input[type="password"] {
+      width: 100%;
+      padding: 8px;
+      background-color: #d9d9d9;
+      border: 2px solid #3a56a1;
+      border-radius: 4px;
+    }
+
+    .login-container input[type="submit"] {
+      margin-top: 20px;
+      width: 100%;
+      padding: 10px;
+      font-weight: bold;
+      color: white;
+      background-color: #3a56a1;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .login-container input[type="submit"]:hover {
+      background-color: #29448c;
+    }
+
+    .error-message {
+      color: red;
+      font-size: 14px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+    <div class="header">Учёт компьютерной техники</div>
+  
+    <div class="login-container">
+      <h2>Вход в систему</h2>
+  
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="error-message">
+            {% for msg in messages %}
+              <p>{{ msg }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+  
+      <form method="post">
+        <label for="username">Имя пользователя:</label>
+        <input type="text" id="username" name="username" required>
+  
+        <label for="password">Пароль:</label>
+        <input type="password" id="password" name="password" required>
+  
+        <input type="submit" value="Войти">
+      </form>
+    </div>
+  
+  </body>
+  </html>

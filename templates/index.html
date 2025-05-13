@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Учёт компьютерной техники</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-left">
+      Учёт компьютерной техники
+      {% if current_user.role == "Руководство" %}
+      <button id="adminMenuToggle" onclick="toggleAdminMenu()">⚙️</button>
+      {% endif %}
+    </div>
+  
+    <div class="profile">
+      <strong>{{ current_user.role }}</strong> <strong>{{ fullname }}</strong> |
+      <a href="/logout" style="color: white;">Выйти</a>
+    </div>
+  </div>
+  
+  <!-- Меню для руководителя -->
+  {% if current_user.role == "Руководство" %}
+  <div id="adminMenu" class="context-menu" style="display: none;">
+    <button onclick="openDepartmentModal()" title="Добавить подразделение">🏢</button>
+    <button onclick="openUserManagementModal()" title="Управление пользователями программы">👤</button>
+    <button onclick="openPCUserModal()" title="Добавить пользователя ПК">🧑‍💻</button>
+    <!-- Можно добавить и другие кнопки позже -->
+  </div>
+  {% endif %}
+  <div class="tabs">
+    <a class="tab-btn active" href="/">Учёт компьютерной техники</a>
+    <a class="tab-btn" href="/history">История изменений</a>
+    <a class="tab-btn" href="/modernization">Планирование модернизации</a>
+  </div>
+
+
+    <div class="main-panel">
+      <!-- Левая панель -->
+      <div class="left-panel">
+        <label for="departmentSelect"><strong>Подразделение:</strong></label>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+          <select id="departmentSelect" onchange="fetchComputersByDepartment()"></select>
+          
+          <!-- Кнопка удаления -->
+          <button id="delete-btn" class="tooltip-btn delete-btn">
+            🗑️
+          <span class="tooltip-text delete-tooltip">Удалить компьютер</span>
+          </button>
+
+          <!-- Кнопка добавления -->
+          <button id="add-btn" class="tooltip-btn add-btn" onclick="addNewComputer()">
+          ➕
+          <span class="tooltip-text add-tooltip">Добавить компьютер</span>
+          </button>
+
+          
+          <form action="/report/inventory/excel" method="get">
+            <button class="excel-inventory-button" title="Скачать Excel: Учет техники">📥</button>
+          </form>
+          
+        </div>
+        
+      
+        <input type="text" id="searchInput" placeholder="Поиск по компьютеру или пользователю" oninput="filterComputers()" />
+
+
+        <div id="computerList">
+          <!-- Сюда загружаются компьютеры -->
+        </div>
+      </div>
+      
+            <!-- Правая панель -->
+<div class="right-panel">
+  <div class="computer-details">
+    <div class="details-header">
+      <button id="edit-button" onclick="enableEditing()">Редактировать</button>
+      <button id="cancel-button" onclick="cancelEditing()" style="display:none;">Отмена</button>
+      <button id="save-button" onclick="saveComputer()" disabled>Сохранить</button>
+    </div>
+  
+    <div class="details-body">
+      <label>Имя компьютера</label>
+      <input type="text" id="pc_name" name="pc_name" class="pc-field" disabled />
+  
+      <label>Имя пользователя</label>
+      <input type="text" id="sam_account_name" name="sam_account_name" list="userList" class="pc-field" disabled />
+      <datalist id="userList"></datalist>
+
+  
+      <label>Тип устройства</label>
+      <select id="device_type" name="type" class="pc-field" disabled>
+        <option value="Компьютер">Компьютер</option>
+        <option value="Ноутбук">Ноутбук</option>
+      </select>
+  
+      <label>Процессор</label>
+      <input type="text" id="processor" list="processorList" />
+      <datalist id="processorList"></datalist>
+  
+      <label>Оперативная память</label>
+      <input type="text" id="ram" name="ram" class="pc-field" disabled />
+  
+      <label>Накопитель</label>
+      <input type="text" id="storage" list="storageList" />
+      <datalist id="storageList"></datalist>
+
+      <label>Монитор</label>
+      <input type="text" id="monitor" list="monitorList" />
+      <datalist id="monitorList"></datalist>
+    </div>
+  </div>
+  </div>
+  
+  
+    <div class="tab-content"></div>
+    <div class="tab-content"></div>
+  
+    <div class="overlay" id="department-overlay">
+      <div class="modal">
+        <h2>Добавить подразделение</h2>
+        <input type="text" id="new-department-name" placeholder="Название подразделения" />
+        <div class="buttons">
+          <button onclick="addDepartment()">Добавить</button>
+          <button onclick="closeDepartmentModal()">Отмена</button>
+        </div>
+        <div id="department-error" class="error-msg"></div>
+      </div>
+    </div>
+    
+    </div>
+
+    <!-- Оверлей добавления пользователя ПК -->
+<div id="pcUserModal" class="overlay">
+  <div class="modal">
+    <h2>Добавить пользователя ПК</h2>
+    <input type="text" id="pcUserLogin" placeholder="Логин (sam_account_name)">
+    <input type="text" id="pcUserName" placeholder="ФИО (cn)">
+    <input type="text" id="pcUserDepartment" list="departmentList" placeholder="Подразделение (title)">
+    <datalist id="departmentList"></datalist>
+    <input type="text" id="pcUserID" placeholder="Табельный номер (employeeID)">
+    <div class="buttons">
+      <button onclick="submitPCUser()">Добавить</button>
+      <button onclick="closePCUserModal()">Отмена</button>
+    </div>
+    <div id="pcUserError" class="error-msg"></div>
+  </div>
+</div>
+
+
+<!-- Модальное окно управления пользователями -->
+<div id="userManagementModal" class="user-modal" style="display: none;">
+  <div class="user-modal-content">
+    <span class="close" onclick="closeUserManagementModal()">&times;</span>
+    <h2>Управление пользователями программы</h2>
+
+    <table id="userTable">
+      <thead>
+        <tr>
+          <th>Имя</th>
+          <th>Роль</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <button onclick="openAddUserForm()">Добавить пользователя</button>
+
+
+
+
+    <div id="addUserForm" style="display: none; margin-top: 20px;">
+      <h3>Добавить нового пользователя</h3>
+      <form id="newUserForm">
+        <label for="newUsername">Имя пользователя:</label>
+        <input type="text" id="newUsername" name="username" required>
+
+        <label for="newFullname">Полное имя:</label>
+        <input type="text" id="newFullname" name="fullname" required>
+
+        <label for="newRole">Роль:</label>
+        <select id="newRole" name="role" required>
+          <option value="Сотрудник">Сотрудник</option>
+          <option value="Руководство">Руководство</option>
+        </select>
+
+        <label for="newPassword">Пароль:</label>
+        <input type="password" id="newPassword" name="password" required>
+
+        <button type="submit">Сохранить</button>
+        <button type="button" onclick="clearUserForm()">Очистить форму</button>
+        <button type="button" onclick="closeAddUserForm()">Отмена</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+</body>
+  <!-- JS -->
+  <script>
+    let selectedPcId = null;
+  
+    async function fetchDepartments() {
+      const res = await fetch('/api/departments');
+      const departments = await res.json();
+      const select = document.getElementById('departmentSelect');
+      select.innerHTML = '';
+      departments.forEach(dep => {
+        const option = document.createElement('option');
+        option.value = dep;
+        option.textContent = dep;
+        select.appendChild(option);
+      });
+      fetchComputersByDepartment();
+    }
+    
+    function filterComputers() {
+     const query = document.getElementById("searchInput").value.toLowerCase();
+     const items = document.querySelectorAll(".computer-item");
+
+      items.forEach(item => {
+       const text = item.textContent.toLowerCase();
+        if (text.includes(query)) {
+          item.style.display = "";
+        } else {
+        item.style.display = "none";
+        }
+        });
+      }
+
+  
+    async function fetchComputersByDepartment() {
+      const department = document.getElementById('departmentSelect').value;
+      const res = await fetch(`/api/computers?department=${encodeURIComponent(department)}`);
+      const computers = await res.json();
+      const list = document.getElementById('computerList');
+      list.innerHTML = '';
+      computers.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'computer-item';
+        div.textContent = `💻 ${c.pc_name} / ${c.sam_account_name}`;
+      div.onclick = () => {
+        selectedPcId = c.pc_name;
+        highlightSelected(c.pc_name);
+        loadComputerDetails(c.pc_name);
+        };
+        div.dataset.id = c.pc_name;
+      list.appendChild(div);
+    });
+
+    }
+  
+    function highlightSelected(pcId) {
+      const items = document.querySelectorAll('.computer-item');
+      items.forEach(item => {
+        if (item.dataset.id === pcId) {
+          item.classList.add('selected');
+        } else {
+          item.classList.remove('selected');
+        }
+      });
+    }
+
+  function openUserManagementModal() {
+  document.getElementById('userManagementModal').style.display = 'block';
+  loadUserList();
+}
+
+function closeUserManagementModal() {
+  document.getElementById('userManagementModal').style.display = 'none';
+}
+
+function loadUserList() {
+  fetch('/api/users')
+    .then(response => response.json())
+    .then(data => {
+      const tbody = document.querySelector('#userTable tbody');
+      tbody.innerHTML = '';
+      data.forEach(user => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${user.fullname}</td>
+          <td>${user.role}</td>
+          <td>
+            <button onclick="editUser('${user.username}', '${user.fullname}', '${user.role}')">Редактировать</button>
+            <button onclick="deleteUser('${user.username}')">Удалить</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    });
+}
+
+function editUser(username, fullname, role) {
+  document.getElementById('newUsername').value = username;
+  document.getElementById('newUsername').disabled = true;
+  document.getElementById('newFullname').value = fullname;
+  document.getElementById('newRole').value = role;
+  document.getElementById('newPassword').value = '';
+  document.getElementById('addUserForm').style.display = 'block';
+}
+
+function deleteUser(username) {
+  if (confirm(`Вы уверены, что хотите удалить пользователя "${username}"?`)) {
+    fetch(`/api/users/${username}`, {
+      method: 'DELETE'
+    })
+    .then(res => {
+      if (res.ok) {
+        alert("Пользователь удалён");
+        loadUserList();
+      } else {
+        alert("Ошибка при удалении");
+      }
+    });
+  }
+}
+
+
+// Открыть форму добавления пользователя
+function openAddUserForm() {
+  document.getElementById('addUserForm').style.display = 'block';
+}
+
+function clearUserForm() {
+  document.getElementById('newUsername').value = '';
+  document.getElementById('newUsername').disabled = false;
+  document.getElementById('newFullname').value = '';
+  document.getElementById('newRole').value = 'Сотрудник';
+  document.getElementById('newPassword').value = '';
+}
+
+// Закрыть форму добавления пользователя
+function closeAddUserForm() {
+  document.getElementById('addUserForm').style.display = 'none';
+}
+
+// Обработка отправки формы добавления пользователя
+document.getElementById('newUserForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+
+  const username = document.getElementById('newUsername').value;
+  const fullname = document.getElementById('newFullname').value;
+  const role = document.getElementById('newRole').value;
+  const password = document.getElementById('newPassword').value;
+
+  const method = document.getElementById('newUsername').disabled ? 'PUT' : 'POST';
+  const url = method === 'PUT' ? `/api/users/${username}` : '/api/users';
+
+  fetch(url, {
+    method: method,
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ username, fullname, role, password })
+  })
+  .then(response => {
+    if (response.ok) {
+      alert(method === 'PUT' ? 'Пользователь обновлен' : 'Пользователь добавлен');
+      closeAddUserForm();
+      loadUserList();
+    } else {
+      response.json().then(err => alert(err.error || 'Ошибка при сохранении пользователя'));
+    }
+  });
+});
+
+function openPCUserModal() {
+  document.getElementById("pcUserModal").style.display = "flex";
+  document.getElementById("pcUserError").textContent = "";
+  loadDepartmentsDatalist();  // Новый вызов
+}
+
+async function loadDepartmentsDatalist() {
+  const res = await fetch('/api/departments');
+  const departments = await res.json();
+  const list = document.getElementById('departmentList');
+  list.innerHTML = '';
+  departments.forEach(d => {
+    const option = document.createElement('option');
+    option.value = d;
+    list.appendChild(option);
+  });
+}
+
+
+function closePCUserModal() {
+  document.getElementById("pcUserModal").style.display = "none";
+}
+
+async function submitPCUser() {
+  const login = document.getElementById("pcUserLogin").value.trim();
+  const cn = document.getElementById("pcUserName").value.trim();
+  const title = document.getElementById("pcUserDepartment").value.trim();
+  const id = document.getElementById("pcUserID").value.trim();
+
+  if (!login || !cn || !title || !id) {
+    document.getElementById("pcUserError").textContent = "Заполните все поля";
+    return;
+  }
+
+  const res = await fetch("/api/pc-users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sam_account_name: login, cn, title, employeeID: id })
+  });
+
+  const result = await res.json();
+  if (res.ok) {
+    alert("Пользователь ПК добавлен");
+    closePCUserModal();
+  } else {
+    document.getElementById("pcUserError").textContent = result.message || "Ошибка при добавлении";
+  }
+}
+
+  
+    async function loadComputerDetails(pcName) {
+      const res = await fetch(`/api/computer/${encodeURIComponent(pcName)}`);
+      const data = await res.json();
+      if (data.error) return;
+  
+      document.getElementById('pc_name').value = data.pc_name;
+      document.getElementById('sam_account_name').value = data.full_name || data.sam_account_name; // ФИО
+      
+      document.getElementById('processor').value = data.processor;
+      document.getElementById('storage').value = data.storage;
+      document.getElementById('monitor').value = data.monitor;
+      document.getElementById('ram').value = data.ram;
+      document.getElementById('device_type').value = data.type;
+    }
+  
+    function addNewComputer() {
+  clearForm();
+  enableEdit(true);
+  selectedPcId = null;
+  loadPcUserDatalist();
+}
+
+function toggleAdminMenu() {
+  const menu = document.getElementById("adminMenu");
+  menu.style.display = menu.style.display === "none" ? "block" : "none";
+}
+
+document.addEventListener("click", function (e) {
+  if (!e.target.closest("#adminMenu") && !e.target.closest("#adminMenuToggle")) {
+    const menu = document.getElementById("adminMenu");
+    if (menu) menu.style.display = "none";
+  }
+});
+
+
+function enableEdit(editing) {
+  const fields = document.querySelectorAll('#pc_name, #sam_account_name, #processor, #storage, #monitor, #ram, #device_type');
+  fields.forEach(f => f.disabled = !editing);
+  document.querySelector('button[onclick="saveComputer()"]').disabled = !editing;
+}
+
+document.getElementById('delete-btn').addEventListener('click', async () => {
+  if (!selectedPcId) {
+    alert("Выберите компьютер для удаления");
+    return;
+  }
+
+  const confirmed = confirm(`Вы действительно хотите удалить компьютер "${selectedPcId}"?`);
+
+  if (confirmed) {
+    const res = await fetch(`/api/computer/${selectedPcId}`, {
+      method: 'DELETE',
+    });
+
+    if (res.ok) {
+      alert("Компьютер удалён");
+      fetchComputersByDepartment();
+      clearForm();
+      selectedPcId = null;
+    } else {
+      alert("Ошибка при удалении");
+    }
+  }
+});
+
+function loadProcessorDatalist() {
+  fetch('/api/components/processors')
+    .then(res => res.json())
+    .then(data => {
+      const list = document.getElementById('processor-list');
+      list.innerHTML = '';
+      data.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        list.appendChild(opt);
+      });
+    });
+}
+
+function loadStorageDatalist() {
+  fetch('/api/components/storages')
+    .then(res => res.json())
+    .then(data => {
+      const list = document.getElementById('storage-list');
+      list.innerHTML = '';
+      data.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        list.appendChild(opt);
+      });
+    });
+}
+
+function loadMonitorDatalist() {
+  fetch('/api/components/monitors')
+    .then(res => res.json())
+    .then(data => {
+      const list = document.getElementById('monitor-list');
+      list.innerHTML = '';
+      data.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        list.appendChild(opt);
+      });
+    });
+}
+
+
+function clearForm() {
+  document.getElementById('pc_name').value = '';
+  document.getElementById('sam_account_name').value = '';
+  document.getElementById('processor').value = '';
+  document.getElementById('storage').value = '';
+  document.getElementById('monitor').value = '';
+  document.getElementById('ram').value = '';
+  document.getElementById('device_type').value = 'Компьютер';
+}
+
+
+
+async function saveComputer() {
+  const body = {
+    pc_name: document.getElementById('pc_name').value,
+    sam_account_name: document.getElementById('sam_account_name').value,
+    processor: document.getElementById('processor').value,
+    storage: document.getElementById('storage').value,
+    monitor: document.getElementById('monitor').value,
+    ram: document.getElementById('ram').value,
+    type: document.getElementById('device_type').value,
+    department: document.getElementById('departmentSelect').value
+  };
+
+  const method = selectedPcId ? 'PUT' : 'POST';
+  const url = selectedPcId ? `/api/computer/${selectedPcId}` : `/api/computer`;
+
+  const res = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (res.ok) {
+    alert(selectedPcId ? 'Изменения сохранены' : 'Компьютер добавлен');
+    enableEdit(false);
+    fetchComputersByDepartment();
+  } else {
+    alert('Ошибка при сохранении');
+  }
+}
+
+
+    window.onload = () => {
+  fetchDepartments();
+  loadCustomFields();
+};
+
+function openDepartmentModal() {
+  document.getElementById("department-overlay").style.display = "flex";
+  document.getElementById("new-department-name").value = "";
+  document.getElementById("department-error").textContent = "";
+}
+
+function closeDepartmentModal() {
+  document.getElementById("department-overlay").style.display = "none";
+}
+
+async function addDepartment() {
+  const name = document.getElementById("new-department-name").value.trim();
+  if (!name) {
+    document.getElementById("department-error").textContent = "Введите название";
+    return;
+  }
+
+  const res = await fetch("/api/add-department", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name })
+  });
+
+  const result = await res.json();
+  if (result.status === "ok") {
+    closeDepartmentModal();
+    fetchDepartments(); // обновим список
+  } else {
+    document.getElementById("department-error").textContent = result.message;
+  }
+}
+let originalValues = {};
+
+function enableEditing() {
+  originalValues = {};
+  document.querySelectorAll('.pc-field').forEach(input => {
+    input.disabled = false;
+    originalValues[input.name] = input.value;
+  });
+  document.getElementById('edit-button').style.display = 'none';
+  document.getElementById('cancel-button').style.display = 'inline-block';
+  document.getElementById('save-button').disabled = false;
+  loadPcUserDatalist();  // Подгрузка пользователей
+
+}
+
+async function loadPcUserDatalist() {
+  const res = await fetch('/api/all-pc-users');
+  const users = await res.json();
+  const list = document.getElementById('userList');
+  list.innerHTML = '';
+  users.forEach(user => {
+    const option = document.createElement('option');
+    option.value = user.sam_account_name;
+    option.textContent = user.cn;
+    list.appendChild(option);
+  });
+}
+
+
+function cancelEditing() {
+  document.querySelectorAll('.pc-field').forEach(input => {
+    input.value = originalValues[input.name];
+    input.disabled = true;
+  });
+  document.getElementById('edit-button').style.display = 'inline-block';
+  document.getElementById('cancel-button').style.display = 'none';
+  document.getElementById('save-button').disabled = true;
+}
+
+function saveChanges() {
+  const pcName = document.getElementById("pc_name").value;
+  const data = {};
+  document.querySelectorAll(".pc-field").forEach(input => {
+    data[input.name] = input.value;
+  });
+
+  fetch(`/api/computer/${encodeURIComponent(pcName)}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  }).then(res => {
+    if (res.ok) {
+      alert("✅ Изменения сохранены");
+      cancelEditing();
+      loadComputers(); // Обновляем список
+    } else {
+      alert("❌ Ошибка при сохранении");
+    }
+  });
+}
+
+function copyComputer() {
+  const data = {};
+  document.querySelectorAll('.pc-field').forEach(input => {
+    data[input.name] = input.value;
+  });
+
+  data.pc_name += "-COPY"; // Уникализируем имя
+
+  fetch('/api/computer', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  }).then(res => {
+    if (res.ok) {
+      alert('✅ Компьютер скопирован');
+      loadComputers();
+    } else {
+      alert('❌ Не удалось скопировать');
+    }
+  });
+}
+
+
+
+</script>
+</html>

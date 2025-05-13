@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>История изменений</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      Учёт компьютерной техники
+      <!--{% if current_user.role == "Руководство" %}
+      <button id="adminMenuToggle" onclick="toggleAdminMenu()">⚙️</button>
+      {% endif %}-->
+    </div>
+  
+    <div class="profile">
+      <strong>{{ current_user.role }}</strong> <strong>{{ fullname }}</strong> |
+      <a href="/logout" style="color: white;">Выйти</a>
+    </div>
+  </div>
+  
+  <!-- Меню для руководителя -->
+  <!--{% if current_user.role == "Руководство" %}
+  <div id="adminMenu" class="context-menu" style="display: none;">
+    <button onclick="openDepartmentModal()">Добавить подразделение</button>-->
+
+    <!-- Можно добавить и другие кнопки позже -->
+  </div>
+  <!--{% endif %}-->
+  
+  
+  <div class="tabs">
+    <a class="tab-btn" href="/">Учёт компьютерной техники</a>
+    <a class="tab-btn active" href="/history">История изменений</a>
+    <a class="tab-btn" href="/modernization">Планирование модернизации</a>
+  </div>
+  
+
+  <div class="section">
+    <label>Поиск по дате:</label>
+    <input type="text" id="dateFilter" oninput="filterHistory()" />
+    <label>Поиск по пользователю:</label>
+    <input type="text" id="userFilter" oninput="filterHistory()" />
+    <label>Поиск по TL-WS:</label>
+    <input type="text" id="pcFilter" oninput="filterHistory()" />
+    
+    <button onclick="clearFilters()" class="clear-filters-btn">Очистить фильтры</button>
+
+  </div>
+
+  <table id="history-table">
+    <thead>
+      <tr>
+        <th>Имя компьютера</th>
+        <th>Пользователь</th>
+        <th>Дата</th>
+        <th>Старое значение</th>
+        <th>Новое значение</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  
+  <button id="loadMore" style="margin-top: 20px;">Показать ещё</button>
+
+  
+
+  
+
+  <form action="/report/history/excel" method="get" style="display:inline;">
+    <button class="excel-history-button" title="Скачать Excel: История изменений">📥</button>
+  </form>
+  
+
+  <script>
+let currentPage = 1;
+const tableBody = document.querySelector("table tbody");
+const loadMoreButton = document.getElementById("loadMore");
+
+function loadHistoryPage(page) {
+  fetch(`/api/history?page=${page}`)
+    .then(response => response.json())
+    .then(data => {
+      data.entries.forEach(entry => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${entry.pc}</td>
+          <td>${entry.user}</td>
+          <td>${entry.date}</td>
+          <td>${entry.old}</td>
+          <td>${entry.new}</td>
+        `;
+        tableBody.appendChild(row);
+      });
+
+      if (page >= data.total_pages) {
+        loadMoreButton.style.display = "none";
+      }
+    })
+    .catch(error => {
+      console.error("Ошибка загрузки истории:", error);
+    });
+}
+
+loadMoreButton.addEventListener("click", () => {
+  currentPage++;
+  loadHistoryPage(currentPage);
+});
+
+// Загрузка первой страницы при старте
+loadHistoryPage(currentPage);
+
+document.addEventListener("DOMContentLoaded", () => loadPage(1)); 
+
+function filterHistory() {
+  const date = document.getElementById("dateFilter").value;
+  const user = document.getElementById("userFilter").value.toLowerCase();
+  const pc = document.getElementById("pcFilter").value.toLowerCase();
+
+  const rows = document.querySelectorAll("#history-table tr");
+
+  rows.forEach((row, index) => {
+    if (index === 0) return; // пропустить заголовок
+
+    const dateCol = row.children[2].textContent.trim();
+    const userCol = row.children[1].textContent.toLowerCase();
+    const pcCol = row.children[0].textContent.toLowerCase();
+
+    const match =
+      (date === "" || dateCol.startsWith(date)) &&
+      userCol.includes(user) &&
+      pcCol.includes(pc);
+
+    row.style.display = match ? "" : "none";
+  });
+}
+
+function clearFilters() {
+  document.getElementById("dateFilter").value = "";
+  document.getElementById("userFilter").value = "";
+  document.getElementById("pcFilter").value = "";
+  filterHistory();
+}
+
+
+
+    
+  window.onload = loadHistory;
+
+
+
+
+
+</script>
+    
+</body>
+</html>
